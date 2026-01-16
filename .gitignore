@@ -52,3 +52,12 @@ pids
 # Build outputs (if using any build tools in future)
 dist/
 build/
+
+# Node modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env
+.env.local

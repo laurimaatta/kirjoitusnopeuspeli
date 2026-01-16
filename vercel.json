@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/leaderboard.js": {
+      "runtime": "@vercel/node"
+    }
+  }
+}

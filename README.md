@@ -5,11 +5,12 @@ Verkkoperustainen kirjoitusnopeuspeli suomenkielisille pelaajille. Pelissä sana
 ## Ominaisuudet
 
 - 🎮 Selainpohjainen peli - ei tarvetta asennukselle
-- 📊 Top-lista - tallentaa parhaat tulokset selaimen paikalliseen tallennustilaan
+- 📊 Globaali top-lista - tallentaa parhaat tulokset Vercel KV -tietokantaan
 - ⚡ Nopeutuu ajan myötä - peli kiihtyy jatkuvasti
 - 🚨 Virhehävitys - väärät näppäilyt eivät pysäytä peliä, mutta aiheuttavat visuaalisen ja äänellisen hälytyksen
 - 🎨 Moderni ja ammattimainen ulkoasu
 - 🇫🇮 Suomeksi - käyttöliittymä ja sanat
+- 🌐 Yhteinen top-lista kaikille pelaajille
 
 ## Asennus ja käyttö
 
@@ -34,11 +35,21 @@ Peli on staattinen verkkosovellus, joten sen voi helposti julkaista mihin tahans
 2. Kytke Netlify GitHub-repositorioon
 3. Aseta Build command: (tyhjä) ja Publish directory: /
 
-#### Vercel
+#### Vercel (Suositeltu - globaali top-lista)
 
 1. Asenna Vercel CLI: `npm i -g vercel`
-2. Projekti-kansiossa: `vercel`
-3. Seuraa ohjeita
+2. Projekti-kansiossa: `npm install` (asentaa riippuvuudet)
+3. Luo Vercel KV -tietokanta:
+   - Mene Vercel Dashboardiin
+   - Valitse projekti → Storage → Create Database → KV
+   - Vaihtoehtoisesti käytä CLI:tä: `vercel kv create`
+4. Yhdistä KV -tietokanta projektiin:
+   - Dashboard: Storage → KV → Connect to Project
+   - TAI CLI: `vercel link` ja valitse projekti, sitten `vercel env pull`
+5. Julkaise projekti: `vercel`
+6. Lisää ympäristömuuttujat (jos ei automaattisesti):
+   - Vercel Dashboard → Project → Settings → Environment Variables
+   - `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN` lisätään automaattisesti KV:n yhdistämisen jälkeen
 
 #### Muut palvelut
 
@@ -57,16 +68,21 @@ Peli toimii millä tahansa palvelulla, joka palvelee staattisia HTML-tiedostoja 
 - HTML5
 - CSS3 (Grid, Flexbox, Animations)
 - Vanilla JavaScript (ES6+)
-- LocalStorage (top-listan tallennukseen)
+- Vercel KV (Redis) - globaali top-lista
+- Vercel Serverless Functions - API-päätepisteet
 
 ## Tiedostorakenne
 
 ```
 typewriter/
+├── api/
+│   └── leaderboard.js  # API-päätepiste top-listalle (GET, POST)
 ├── index.html          # Pää-HTML-tiedosto
 ├── styles.css          # Tyylitiedosto
 ├── game.js            # Pelilogiikka
 ├── words.js           # Suomenkieliset sanat
+├── package.json       # NPM-riippuvuudet
+├── vercel.json        # Vercel-konfiguraatio
 ├── README.md          # Tämä tiedosto
 └── .gitignore         # Git-ignore-tiedosto
 ```

@@ -339,29 +339,50 @@ class TypingGame {
         
         this.finalScoreElement.textContent = this.score;
         
-        // Check if score qualifies for leaderboard
-        const leaderboard = this.getLeaderboard();
-        const minScore = leaderboard.length < 10 ? 0 : Math.min(...leaderboard.map(e => e.score));
-        
-        if (this.score > minScore || leaderboard.length < 10) {
-            document.getElementById('leaderboard-section').style.display = 'block';
-            document.getElementById('player-name-input').focus();
-        }
+        // Check if score qualifies for leaderboard (async)
+        this.checkLeaderboardQualification();
         
         this.gameOverModal.classList.add('active');
         this.wordInput.disabled = true;
     }
     
-    getLeaderboard() {
-        const stored = localStorage.getItem('typingGameLeaderboard');
-        return stored ? JSON.parse(stored) : [];
+    async checkLeaderboardQualification() {
+        try {
+            const leaderboard = await this.getLeaderboard();
+            const minScore = leaderboard.length < 10 ? 0 : Math.min(...leaderboard.map(e => e.score));
+            
+            if (this.score > minScore || leaderboard.length < 10) {
+                document.getElementById('leaderboard-section').style.display = 'block';
+                document.getElementById('player-name-input').focus();
+            }
+        } catch (error) {
+            console.error('Error checking leaderboard qualification:', error);
+            // On error, still show the leaderboard section to allow saving
+            document.getElementById('leaderboard-section').style.display = 'block';
+            document.getElementById('player-name-input').focus();
+        }
+    }
+    
+    async getLeaderboard() {
+        try {
+            const response = await fetch('/api/leaderboard');
+            if (!response.ok) {
+                throw new Error('Failed to fetch leaderboard');
+            }
+            const data = await response.json();
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching leaderboard:', error);
+            // Fallback to empty array on error
+            return [];
+        }
     }
     
     loadLeaderboard() {
         // Leaderboard is loaded when modal is shown
     }
     
-    saveScore() {
+    async saveScore() {
         const nameInput = document.getElementById('player-name-input');
         const name = nameInput.value.trim() || 'Nimetön';
         
@@ -370,49 +391,70 @@ class TypingGame {
             return;
         }
         
-        const leaderboard = this.getLeaderboard();
-        leaderboard.push({
-            name: name,
-            score: this.score,
-            date: new Date().toISOString()
-        });
+        const saveBtn = document.getElementById('save-score-btn');
+        const originalText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Tallennetaan...';
         
-        // Sort by score (descending)
-        leaderboard.sort((a, b) => b.score - a.score);
-        
-        // Keep only top 10
-        const top10 = leaderboard.slice(0, 10);
-        
-        localStorage.setItem('typingGameLeaderboard', JSON.stringify(top10));
-        
-        document.getElementById('leaderboard-section').style.display = 'none';
-        nameInput.value = '';
-        this.showLeaderboard();
+        try {
+            const response = await fetch('/api/leaderboard', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name,
+                    score: this.score
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to save score');
+            }
+            
+            document.getElementById('leaderboard-section').style.display = 'none';
+            nameInput.value = '';
+            await this.showLeaderboard();
+            
+        } catch (error) {
+            console.error('Error saving score:', error);
+            alert('Tuloksen tallennus epäonnistui: ' + error.message);
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = originalText;
+        }
     }
     
-    showLeaderboard() {
-        const leaderboard = this.getLeaderboard();
+    async showLeaderboard() {
         const listElement = document.getElementById('leaderboard-list');
-        
-        if (leaderboard.length === 0) {
-            listElement.innerHTML = '<p>Top-listalla ei ole vielä tuloksia.</p>';
-        } else {
-            listElement.innerHTML = leaderboard.map((entry, index) => {
-                const date = new Date(entry.date);
-                const dateStr = date.toLocaleDateString('fi-FI');
-                const rankClass = index < 3 ? `rank-${index + 1}` : '';
-                
-                return `
-                    <div class="leaderboard-item ${rankClass}">
-                        <span class="leaderboard-rank">${index + 1}.</span>
-                        <span class="leaderboard-name">${entry.name}</span>
-                        <span class="leaderboard-score">${entry.score} pts</span>
-                    </div>
-                `;
-            }).join('');
-        }
-        
+        listElement.innerHTML = '<p>Ladataan...</p>';
         this.leaderboardModal.classList.add('active');
+        
+        try {
+            const leaderboard = await this.getLeaderboard();
+            
+            if (leaderboard.length === 0) {
+                listElement.innerHTML = '<p>Top-listalla ei ole vielä tuloksia.</p>';
+            } else {
+                listElement.innerHTML = leaderboard.map((entry, index) => {
+                    const date = new Date(entry.date);
+                    const dateStr = date.toLocaleDateString('fi-FI');
+                    const rankClass = index < 3 ? `rank-${index + 1}` : '';
+                    
+                    return `
+                        <div class="leaderboard-item ${rankClass}">
+                            <span class="leaderboard-rank">${index + 1}.</span>
+                            <span class="leaderboard-name">${entry.name}</span>
+                            <span class="leaderboard-score">${entry.score} pts</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        } catch (error) {
+            console.error('Error loading leaderboard:', error);
+            listElement.innerHTML = '<p>Top-listan lataaminen epäonnistui. Yritä myöhemmin uudelleen.</p>';
+        }
     }
 }
 
