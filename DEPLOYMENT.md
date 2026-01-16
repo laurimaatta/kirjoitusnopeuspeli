@@ -4,34 +4,81 @@ Tämä ohje kertoo, miten peli otetaan käyttöön Vercelissä globaalilla top-l
 
 ## Vaiheet
 
+### 0. Asenna Vercel CLI (jos ei ole vielä asennettuna)
+
+**Vaihtoehto 1: npm (suositeltu)**
+
+```bash
+npm install -g vercel
+```
+
+**Vaihtoehto 2: yarn**
+
+```bash
+yarn global add vercel
+```
+
+**Vaihtoehto 3: Homebrew (macOS)**
+
+```bash
+brew install vercel-cli
+```
+
+**Vaihtoehto 4: Windows (Scoop)**
+
+```bash
+scoop install vercel
+```
+
+Tarkista asennus:
+
+```bash
+vercel --version
+```
+
 ### 1. Valmistele projekti
 
 ```bash
 npm install
 ```
 
-### 2. Luo Vercel KV -tietokanta
+### 2. Luo Redis -tietokanta
 
 1. Mene [Vercel Dashboard](https://vercel.com/dashboard)
 2. Valitse projekti (tai luo uusi)
 3. Mene **Storage**-välilehteen
 4. Klikkaa **Create Database**
-5. Valitse **KV** (Redis)
+5. Valitse **Redis**
 6. Valitse haluamasi alue (region)
 7. Luo tietokanta
 
-### 3. Yhdistä KV projektiin
+### 3. Yhdistä Redis projektiin
 
-1. Klikkaa luomasi KV -tietokantaa
+1. Klikkaa luomasi Redis -tietokantaa
 2. Klikkaa **Connect to Project**
 3. Valitse projekti, johon haluat yhdistää
 
 **Tärkeää:** Vercel lisää automaattisesti seuraavat ympäristömuuttujat:
-- `KV_REST_API_URL`
-- `KV_REST_API_TOKEN`
-- `KV_REST_API_READ_ONLY_TOKEN`
 
-### 4. Paikallinen testaus (valinnainen)
+- `REDIS_URL` (tai `KV_URL`)
+
+### 4. Yhdistä projekti paikalliseen kehitykseen
+
+```bash
+vercel link
+```
+
+Valitse projekti, johon Redis on yhdistetty.
+
+### 5. Hae ympäristömuuttujat paikalliseen käyttöön
+
+```bash
+vercel env pull .env.development.local
+```
+
+Tämä luo `.env.development.local` -tiedoston ympäristömuuttujilla.
+
+### 6. Paikallinen testaus (valinnainen)
 
 Jos haluat testata paikallisesti:
 
@@ -41,11 +88,9 @@ vercel dev
 
 Tämä käynnistää paikallisen kehityspalvelimen, joka simuloi Vercelin ympäristöä.
 
-**Huom:** KV-ympäristömuuttujat tarvitsevat Vercelin palvelun. Jos testaat paikallisesti, voit:
-- Käyttää `vercel env pull` noutamaan ympäristömuuttujat
-- TAI käyttää `vercel dev`, joka hoitaa tämän automaattisesti
+**Huom:** Redis-yhteys vaatii ympäristömuuttujat. Varmista että `.env.development.local` on luotu (`vercel env pull`).
 
-### 5. Julkaise projekti
+### 7. Julkaise projekti
 
 ```bash
 vercel --prod
@@ -62,11 +107,12 @@ Tai pushaa GitHubiin ja Vercel julkaisee automaattisesti.
 
 ## Ongelmatilanteet
 
-### "KV client not initialized"
+### "Redis client not initialized" / "REDIS_URL environment variable is not set"
 
-- Tarkista että KV on yhdistetty projektiin
-- Tarkista että ympäristömuuttujat ovat olemassa Vercel Dashboard → Project → Settings → Environment Variables
-- Varmista että `@vercel/kv` on asennettuna (`npm install`)
+- Tarkista että Redis on yhdistetty projektiin
+- Tarkista että `REDIS_URL` (tai `KV_URL`) on olemassa Vercel Dashboard → Project → Settings → Environment Variables
+- Varmista että `redis` on asennettuna (`npm install`)
+- Jos testaat paikallisesti, varmista että `.env.development.local` on luotu (`vercel env pull .env.development.local`)
 
 ### API endpoint ei toimi
 
@@ -80,12 +126,16 @@ Tai pushaa GitHubiin ja Vercel julkaisee automaattisesti.
 
 ## Ympäristömuuttujat
 
-Vercel lisää nämä automaattisesti KV:n yhdistämisen jälkeen:
+Vercel lisää automaattisesti Redis-yhteyden yhdistämisen jälkeen:
 
 ```
-KV_REST_API_URL=https://...
-KV_REST_API_TOKEN=...
-KV_REST_API_READ_ONLY_TOKEN=...
+REDIS_URL=redis://... (tai KV_URL=redis://...)
 ```
 
-**Älä lisää näitä manuaalisesti** - ne lisätään automaattisesti.
+**Älä lisää näitä manuaalisesti** - ne lisätään automaattisesti, kun yhdistät Redis-projektin.
+
+Jos testaat paikallisesti, hae ympäristömuuttujat komennolla:
+
+```bash
+vercel env pull .env.development.local
+```

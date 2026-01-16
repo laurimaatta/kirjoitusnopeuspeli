@@ -37,19 +37,24 @@ Peli on staattinen verkkosovellus, joten sen voi helposti julkaista mihin tahans
 
 #### Vercel (Suositeltu - globaali top-lista)
 
-1. Asenna Vercel CLI: `npm i -g vercel`
+1. Asenna Vercel CLI:
+   ```bash
+   npm install -g vercel
+   ```
+   Tarkista asennus: `vercel --version`
 2. Projekti-kansiossa: `npm install` (asentaa riippuvuudet)
-3. Luo Vercel KV -tietokanta:
+3. Luo Redis -tietokanta:
    - Mene Vercel Dashboardiin
-   - Valitse projekti → Storage → Create Database → KV
-   - Vaihtoehtoisesti käytä CLI:tä: `vercel kv create`
-4. Yhdistä KV -tietokanta projektiin:
-   - Dashboard: Storage → KV → Connect to Project
-   - TAI CLI: `vercel link` ja valitse projekti, sitten `vercel env pull`
-5. Julkaise projekti: `vercel`
-6. Lisää ympäristömuuttujat (jos ei automaattisesti):
-   - Vercel Dashboard → Project → Settings → Environment Variables
-   - `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN` lisätään automaattisesti KV:n yhdistämisen jälkeen
+   - Valitse projekti → Storage → Create Database → Redis
+4. Yhdistä Redis -tietokanta projektiin:
+   - Dashboard: Storage → Redis → Connect to Project
+5. Yhdistä projekti paikalliseen kehitykseen:
+   - CLI: `vercel link` ja valitse projekti
+6. Hae ympäristömuuttujat (paikalliseen testaukseen):
+   - CLI: `vercel env pull .env.development.local`
+7. Julkaise projekti: `vercel --prod`
+   
+**Huom:** Vercel lisää `REDIS_URL` ympäristömuuttujan automaattisesti Redis:n yhdistämisen jälkeen.
 
 #### Muut palvelut
 
@@ -68,7 +73,7 @@ Peli toimii millä tahansa palvelulla, joka palvelee staattisia HTML-tiedostoja 
 - HTML5
 - CSS3 (Grid, Flexbox, Animations)
 - Vanilla JavaScript (ES6+)
-- Vercel KV (Redis) - globaali top-lista
+- Redis (Vercel Storage) - globaali top-lista
 - Vercel Serverless Functions - API-päätepisteet
 
 ## Tiedostorakenne

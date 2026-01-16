@@ -1,7 +1,36 @@
-import { kv } from '@vercel/kv';
+import { createClient } from 'redis';
 
 const LEADERBOARD_KEY = 'typing_game_leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
+
+// Create Redis client - reuse connection across invocations
+let redisClient = null;
+
+async function getRedisClient() {
+  if (redisClient && redisClient.isOpen) {
+    return redisClient;
+  }
+
+  // Get Redis connection URL from environment variables
+  // Vercel Redis provides REDIS_URL automatically
+  const redisUrl = process.env.REDIS_URL || process.env.KV_URL;
+  
+  if (!redisUrl) {
+    throw new Error('REDIS_URL environment variable is not set');
+  }
+
+  redisClient = createClient({
+    url: redisUrl
+  });
+
+  redisClient.on('error', (err) => console.error('Redis Client Error', err));
+  
+  if (!redisClient.isOpen) {
+    await redisClient.connect();
+  }
+
+  return redisClient;
+}
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -14,10 +43,16 @@ export default async function handler(req, res) {
     return;
   }
 
+  let redis = null;
+
   try {
+    // Get Redis client
+    redis = await getRedisClient();
+
     if (req.method === 'GET') {
-      // Get leaderboard
-      const leaderboard = await kv.get(LEADERBOARD_KEY) || [];
+      // Get leaderboard from Redis
+      const leaderboardJson = await redis.get(LEADERBOARD_KEY);
+      const leaderboard = leaderboardJson ? JSON.parse(leaderboardJson) : [];
       
       // Sort by score descending and return top entries
       const sorted = leaderboard
@@ -39,8 +74,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Pisteiden on oltava positiivinen numero.' });
       }
       
-      // Get current leaderboard
-      let leaderboard = await kv.get(LEADERBOARD_KEY) || [];
+      // Get current leaderboard from Redis
+      const leaderboardJson = await redis.get(LEADERBOARD_KEY);
+      let leaderboard = leaderboardJson ? JSON.parse(leaderboardJson) : [];
       
       // Add new entry
       const newEntry = {
@@ -56,8 +92,8 @@ export default async function handler(req, res) {
         .sort((a, b) => b.score - a.score)
         .slice(0, MAX_LEADERBOARD_ENTRIES);
       
-      // Save back to KV
-      await kv.set(LEADERBOARD_KEY, leaderboard);
+      // Save back to Redis as JSON string
+      await redis.set(LEADERBOARD_KEY, JSON.stringify(leaderboard));
       
       res.status(200).json({ success: true, leaderboard });
       
@@ -67,6 +103,6 @@ export default async function handler(req, res) {
     
   } catch (error) {
     console.error('Leaderboard API error:', error);
-    res.status(500).json({ error: 'Sisäinen palvelinvirhe' });
+    res.status(500).json({ error: 'Sisäinen palvelinvirhe: ' + error.message });
   }
 }
