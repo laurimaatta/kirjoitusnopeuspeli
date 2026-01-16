@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kirjoitusnopeuspeli</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="game-header">
+            <h1>Kirjoitusnopeuspeli</h1>
+            <div class="stats">
+                <div class="stat">
+                    <span class="stat-label">Pisteet:</span>
+                    <span id="score">0</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Sana:</span>
+                    <span id="current-word-index">0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-area" id="game-area">
+            <!-- Words will be dynamically added here -->
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="word-input" autocomplete="off" spellcheck="false" placeholder="Aloita kirjoittamalla...">
+            <div class="input-feedback" id="input-feedback"></div>
+        </div>
+
+        <div class="game-over-modal" id="game-over-modal">
+            <div class="modal-content">
+                <h2>Peli loppui!</h2>
+                <p class="final-score">Lopulliset pisteet: <span id="final-score">0</span></p>
+                <div id="leaderboard-section" style="display: none;">
+                    <h3>Olet päässyt top-listalle!</h3>
+                    <input type="text" id="player-name-input" placeholder="Syötä nimesi" maxlength="20">
+                    <button id="save-score-btn">Tallenna</button>
+                </div>
+                <div class="modal-buttons">
+                    <button id="play-again-btn">Pelaa uudelleen</button>
+                    <button id="view-leaderboard-btn">Top-lista</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="leaderboard-modal" id="leaderboard-modal">
+            <div class="modal-content">
+                <h2>Top-lista</h2>
+                <div id="leaderboard-list"></div>
+                <button id="close-leaderboard-btn">Sulje</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <p>Kirjoita näytölle ilmestyvät sanat ennen kuin ne osuvat oikeaan seinään!</p>
+        </div>
+    </div>
+
+    <script src="words.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
