@@ -22,12 +22,23 @@
             </div>
         </div>
 
+        <div class="start-screen" id="start-screen">
+            <div class="start-content">
+                <h2>Kirjoitusnopeuspeli</h2>
+                <p class="start-description">Kirjoita näytölle ilmestyvät sanat ennen kuin ne osuvat oikeaan seinään!</p>
+                <div class="start-buttons">
+                    <button id="start-game-btn" class="start-btn primary">Aloita peli</button>
+                    <button id="pre-game-leaderboard-btn" class="start-btn secondary">Top-lista</button>
+                </div>
+            </div>
+        </div>
+
         <div class="game-area" id="game-area">
             <!-- Words will be dynamically added here -->
         </div>
 
         <div class="input-area">
-            <input type="text" id="word-input" autocomplete="off" spellcheck="false" placeholder="Aloita kirjoittamalla...">
+            <input type="text" id="word-input" autocomplete="off" spellcheck="false" placeholder="Kirjoita sanat tässä..." disabled>
             <div class="input-feedback" id="input-feedback"></div>
         </div>
 

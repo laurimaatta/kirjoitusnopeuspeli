@@ -13,14 +13,15 @@ class TypingGame {
         this.activeWords = [];
         this.score = 0;
         this.currentWordIndex = 0;
-        this.gameSpeed = 0.5; // pixels per frame
-        this.baseSpeed = 0.5;
-        this.speedIncrease = 0.01;
+        this.gameSpeed = 1.2; // pixels per frame (faster initial speed)
+        this.baseSpeed = 1.2;
+        this.speedIncrease = 0.05;
         this.gameRunning = false;
         this.gameLoop = null;
         this.wordSpawnInterval = null;
         this.lastSpawnTime = 0;
-        this.spawnDelay = 3000; // milliseconds
+        this.spawnDelay = 2000; // milliseconds (spawn faster for more words)
+        this.maxActiveWords = 4; // Maximum 3-4 words at once
         
         this.typoSound = this.createTypoSound();
         
@@ -57,6 +58,8 @@ class TypingGame {
         });
         
         document.getElementById('play-again-btn').addEventListener('click', () => {
+            this.gameOverModal.classList.remove('active');
+            this.hideStartScreen();
             this.startGame();
         });
         
@@ -64,13 +67,40 @@ class TypingGame {
             this.showLeaderboard();
         });
         
-        document.getElementById('close-leaderboard-btn').addEventListener('click', () => {
-            this.leaderboardModal.classList.remove('active');
-        });
-        
         document.getElementById('save-score-btn').addEventListener('click', () => {
             this.saveScore();
         });
+        
+        document.getElementById('start-game-btn').addEventListener('click', () => {
+            this.hideStartScreen();
+            this.startGame();
+        });
+        
+        document.getElementById('pre-game-leaderboard-btn').addEventListener('click', () => {
+            this.showLeaderboard();
+        });
+        
+        // Re-show start screen when leaderboard is closed from pre-game
+        document.getElementById('close-leaderboard-btn').addEventListener('click', () => {
+            this.leaderboardModal.classList.remove('active');
+            if (!this.gameRunning) {
+                // If game hasn't started yet, keep start screen visible
+                setTimeout(() => {
+                    if (!this.gameRunning && !this.gameOverModal.classList.contains('active')) {
+                        this.showStartScreen();
+                    }
+                }, 100);
+            }
+        });
+    }
+    
+    hideStartScreen() {
+        document.getElementById('start-screen').style.display = 'none';
+    }
+    
+    showStartScreen() {
+        document.getElementById('start-screen').style.display = 'flex';
+        this.wordInput.disabled = true;
     }
     
     startGame() {
@@ -88,12 +118,23 @@ class TypingGame {
         this.leaderboardModal.classList.remove('active');
         document.getElementById('leaderboard-section').style.display = 'none';
         
+        this.wordInput.disabled = false;
         this.wordInput.focus();
         this.lastSpawnTime = Date.now();
-        this.spawnWord();
+        
+        // Spawn initial batch of 3-4 words
+        const initialCount = Math.min(3 + Math.floor(Math.random() * 2), this.maxActiveWords);
+        for (let i = 0; i < initialCount; i++) {
+            setTimeout(() => this.spawnWord(), i * 300);
+        }
         
         this.gameLoop = requestAnimationFrame(() => this.update());
-        this.wordSpawnInterval = setInterval(() => this.spawnWord(), this.spawnDelay);
+        this.wordSpawnInterval = setInterval(() => {
+            // Only spawn if we have room for more words
+            if (this.activeWords.length < this.maxActiveWords) {
+                this.spawnWord();
+            }
+        }, this.spawnDelay);
     }
     
     spawnWord() {
@@ -116,11 +157,19 @@ class TypingGame {
         
         this.gameArea.appendChild(wordElement);
         
+        // Random velocities: mostly to the right, but also some vertical movement
+        // Horizontal velocity: base speed + small random variation (mostly positive/right)
+        const horizontalVel = this.gameSpeed + (Math.random() - 0.3) * 0.3;
+        // Vertical velocity: random between -0.8 and 0.8 (can go up or down)
+        const verticalVel = (Math.random() - 0.5) * 1.6;
+        
         this.activeWords.push({
             element: wordElement,
             word: word,
             x: 0,
             y: y,
+            vx: Math.max(0.3, horizontalVel), // Ensure mostly rightward movement
+            vy: verticalVel,
             index: this.currentWordIndex
         });
         
@@ -134,12 +183,28 @@ class TypingGame {
         }
         
         const gameAreaWidth = this.gameArea.clientWidth;
+        const gameAreaHeight = this.gameArea.clientHeight;
         const wordsToRemove = [];
         
-        // Update word positions
+        // Update word positions with velocity
         this.activeWords.forEach((wordObj, index) => {
-            wordObj.x += this.gameSpeed;
+            // Update position based on velocity
+            wordObj.x += wordObj.vx;
+            wordObj.y += wordObj.vy;
+            
+            // Bounce off top and bottom walls
+            const wordHeight = wordObj.element.offsetHeight;
+            if (wordObj.y <= 0) {
+                wordObj.y = 0;
+                wordObj.vy = -wordObj.vy; // Bounce down
+            } else if (wordObj.y + wordHeight >= gameAreaHeight) {
+                wordObj.y = gameAreaHeight - wordHeight;
+                wordObj.vy = -wordObj.vy; // Bounce up
+            }
+            
+            // Update DOM position
             wordObj.element.style.left = `${wordObj.x}px`;
+            wordObj.element.style.top = `${wordObj.y}px`;
             
             // Check collision with right wall
             const wordWidth = wordObj.element.offsetWidth;
@@ -147,6 +212,9 @@ class TypingGame {
                 this.endGame();
                 return;
             }
+            
+            // Slight increase in horizontal velocity over time (speed up)
+            wordObj.vx += this.speedIncrease * 0.0005;
         });
         
         // Remove completed words
@@ -154,7 +222,7 @@ class TypingGame {
             this.activeWords.splice(index, 1);
         });
         
-        // Increase speed slightly
+        // Increase base speed slightly
         this.gameSpeed += this.speedIncrease * 0.001;
         
         this.gameLoop = requestAnimationFrame(() => this.update());
@@ -167,39 +235,60 @@ class TypingGame {
         
         const inputValue = e.target.value.trim().toLowerCase();
         
-        // Find the first active word (leftmost)
         if (this.activeWords.length === 0) {
             return;
         }
         
-        // Sort by x position to get leftmost word
-        const sortedWords = [...this.activeWords].sort((a, b) => a.x - b.x);
-        const targetWord = sortedWords[0];
-        const targetWordText = targetWord.word.toLowerCase();
+        // Try to find a matching word (exact or partial match)
+        let matchedWord = null;
+        let isExactMatch = false;
         
-        // Mark as active
+        for (const wordObj of this.activeWords) {
+            const wordText = wordObj.word.toLowerCase();
+            if (inputValue === wordText) {
+                matchedWord = wordObj;
+                isExactMatch = true;
+                break;
+            } else if (wordText.startsWith(inputValue) && inputValue.length > 0) {
+                // Partial match - use the closest one to the left if multiple match
+                if (!matchedWord || wordObj.x < matchedWord.x) {
+                    matchedWord = wordObj;
+                }
+            }
+        }
+        
+        // Remove active class from all words
         this.activeWords.forEach(w => w.element.classList.remove('active'));
-        targetWord.element.classList.add('active');
         
-        if (inputValue === targetWordText) {
+        if (isExactMatch && matchedWord) {
             // Correct word typed!
-            this.removeWord(targetWord);
+            this.removeWord(matchedWord);
             e.target.value = '';
             this.inputFeedback.textContent = '';
+            this.inputFeedback.classList.remove('error');
             this.score += 10;
             this.updateScore();
             
-            // Increase speed a bit more on correct typing
-            this.gameSpeed += 0.1;
-        } else if (targetWordText.startsWith(inputValue)) {
-            // Partially correct
+            // Increase speed a bit more on correct typing (for new words)
+            // Current words maintain their velocity
+        } else if (matchedWord && inputValue.length > 0) {
+            // Partially correct - highlight the word being typed
+            matchedWord.element.classList.add('active');
             this.inputFeedback.textContent = '';
             this.inputFeedback.classList.remove('error');
-        } else {
-            // Typo detected
-            this.handleTypo(targetWord);
+        } else if (inputValue.length > 0) {
+            // No match - typo detected
+            // Find the leftmost word for typo effect
+            const sortedWords = [...this.activeWords].sort((a, b) => a.x - b.x);
+            if (sortedWords.length > 0) {
+                this.handleTypo(sortedWords[0]);
+            }
             this.inputFeedback.textContent = 'Virhe! Yritä uudelleen.';
             this.inputFeedback.classList.add('error');
+        } else {
+            // Empty input
+            this.inputFeedback.textContent = '';
+            this.inputFeedback.classList.remove('error');
         }
     }
     
@@ -260,6 +349,7 @@ class TypingGame {
         }
         
         this.gameOverModal.classList.add('active');
+        this.wordInput.disabled = true;
     }
     
     getLeaderboard() {
@@ -329,6 +419,7 @@ class TypingGame {
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
     const game = new TypingGame();
-    // Focus input on load
-    document.getElementById('word-input').focus();
+    game.showStartScreen();
+    // Make game accessible globally for button handlers
+    window.typingGame = game;
 });
