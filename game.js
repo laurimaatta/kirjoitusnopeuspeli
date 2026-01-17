@@ -9,13 +9,13 @@ class TypingGame {
         this.finalScoreElement = document.getElementById('final-score');
         this.inputFeedback = document.getElementById('input-feedback');
         
-        this.words = getRandomWords(200);
         this.activeWords = [];
         this.score = 0;
-        this.currentWordIndex = 0;
-        this.gameSpeed = 1.2; // pixels per frame (faster initial speed)
-        this.baseSpeed = 1.2;
-        this.speedIncrease = 0.05;
+        this.wordsTyped = 0; // Track total words typed
+        this.gameSpeed = 1.0; // pixels per frame (initial speed)
+        this.baseSpeed = 1.0;
+        this.speedIncreaseRate = 0.02; // Increase speed more noticeably
+        this.gameStartTime = null;
         this.gameRunning = false;
         this.gameLoop = null;
         this.wordSpawnInterval = null;
@@ -106,8 +106,9 @@ class TypingGame {
     startGame() {
         this.gameRunning = true;
         this.score = 0;
-        this.currentWordIndex = 0;
+        this.wordsTyped = 0;
         this.gameSpeed = this.baseSpeed;
+        this.gameStartTime = Date.now();
         this.activeWords = [];
         this.gameArea.innerHTML = '';
         this.wordInput.value = '';
@@ -138,16 +139,18 @@ class TypingGame {
     }
     
     spawnWord() {
-        if (!this.gameRunning || this.currentWordIndex >= this.words.length) {
+        if (!this.gameRunning) {
             return;
         }
         
-        const word = this.words[this.currentWordIndex];
+        // Select random word from the full library (infinite words)
+        const randomIndex = Math.floor(Math.random() * FINNISH_WORDS.length);
+        const word = FINNISH_WORDS[randomIndex];
+        
         const wordElement = document.createElement('div');
         wordElement.className = 'word';
         wordElement.textContent = word;
         wordElement.dataset.word = word;
-        wordElement.dataset.index = this.currentWordIndex;
         
         // Random vertical position
         const maxY = this.gameArea.clientHeight - 60;
@@ -158,7 +161,7 @@ class TypingGame {
         this.gameArea.appendChild(wordElement);
         
         // Random velocities: mostly to the right, but also some vertical movement
-        // Horizontal velocity: base speed + small random variation (mostly positive/right)
+        // Horizontal velocity: current game speed + small random variation (mostly positive/right)
         const horizontalVel = this.gameSpeed + (Math.random() - 0.3) * 0.3;
         // Vertical velocity: random between -0.8 and 0.8 (can go up or down)
         const verticalVel = (Math.random() - 0.5) * 1.6;
@@ -170,10 +173,9 @@ class TypingGame {
             y: y,
             vx: Math.max(0.3, horizontalVel), // Ensure mostly rightward movement
             vy: verticalVel,
-            index: this.currentWordIndex
+            spawnSpeed: this.gameSpeed // Store speed when word was spawned for scoring
         });
         
-        this.currentWordIndex++;
         this.updateScore();
     }
     
@@ -185,6 +187,11 @@ class TypingGame {
         const gameAreaWidth = this.gameArea.clientWidth;
         const gameAreaHeight = this.gameArea.clientHeight;
         const wordsToRemove = [];
+        
+        // Calculate time-based speed increase (more noticeable)
+        const timeElapsed = (Date.now() - this.gameStartTime) / 1000; // seconds
+        // Speed increases continuously over time
+        this.gameSpeed = this.baseSpeed + (timeElapsed * this.speedIncreaseRate);
         
         // Update word positions with velocity
         this.activeWords.forEach((wordObj, index) => {
@@ -212,18 +219,12 @@ class TypingGame {
                 this.endGame();
                 return;
             }
-            
-            // Slight increase in horizontal velocity over time (speed up)
-            wordObj.vx += this.speedIncrease * 0.0005;
         });
         
         // Remove completed words
         wordsToRemove.forEach(index => {
             this.activeWords.splice(index, 1);
         });
-        
-        // Increase base speed slightly
-        this.gameSpeed += this.speedIncrease * 0.001;
         
         this.gameLoop = requestAnimationFrame(() => this.update());
     }
@@ -262,15 +263,19 @@ class TypingGame {
         
         if (isExactMatch && matchedWord) {
             // Correct word typed!
+            // Calculate score based on current game speed (faster = more points)
+            // Base score 10, multiplied by speed factor (min 1.0, scales up)
+            const speedMultiplier = Math.max(1.0, this.gameSpeed / this.baseSpeed);
+            const pointsEarned = Math.floor(10 * speedMultiplier);
+            
             this.removeWord(matchedWord);
             e.target.value = '';
             this.inputFeedback.textContent = '';
             this.inputFeedback.classList.remove('error');
-            this.score += 10;
-            this.updateScore();
             
-            // Increase speed a bit more on correct typing (for new words)
-            // Current words maintain their velocity
+            this.score += pointsEarned;
+            this.wordsTyped++;
+            this.updateScore();
         } else if (matchedWord && inputValue.length > 0) {
             // Partially correct - highlight the word being typed
             matchedWord.element.classList.add('active');
@@ -319,7 +324,7 @@ class TypingGame {
     
     updateScore() {
         this.scoreElement.textContent = this.score;
-        this.currentWordIndexElement.textContent = this.currentWordIndex;
+        this.currentWordIndexElement.textContent = this.wordsTyped;
     }
     
     endGame() {

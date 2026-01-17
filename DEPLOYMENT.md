@@ -124,6 +124,26 @@ Tai pushaa GitHubiin ja Vercel julkaisee automaattisesti.
 - API-reitti sisältää CORS-otsakkeet
 - Jos ongelmia, tarkista että `Access-Control-Allow-Origin` on asetettu oikein
 
+## Top-listan nollaus
+
+Jos haluat nollata top-listan:
+
+1. Aseta ympäristömuuttuja Vercel Dashboardissa:
+   - Mene Project → Settings → Environment Variables
+   - Lisää uusi muuttuja: `LEADERBOARD_RESET_SECRET`
+   - Anna sille arvo (esim. satunnainen merkkijono)
+   - Julkaise projekti uudelleen
+
+2. Avaa `/reset-leaderboard.html` julkaistussa sovelluksessa
+3. Syötä salainen avain ja klikkaa "Nollaa Top-lista"
+
+Vaihtoehtoisesti voit käyttää API:ta suoraan:
+```bash
+curl -X DELETE https://your-app.vercel.app/api/leaderboard \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"your-secret-key"}'
+```
+
 ## Ympäristömuuttujat
 
 Vercel lisää automaattisesti Redis-yhteyden yhdistämisen jälkeen:
@@ -132,7 +152,9 @@ Vercel lisää automaattisesti Redis-yhteyden yhdistämisen jälkeen:
 REDIS_URL=redis://... (tai KV_URL=redis://...)
 ```
 
-**Älä lisää näitä manuaalisesti** - ne lisätään automaattisesti, kun yhdistät Redis-projektin.
+**Valinnainen:** Aseta `LEADERBOARD_RESET_SECRET` jos haluat käyttää reset-toimintoa.
+
+**Älä lisää REDIS_URL manuaalisesti** - se lisätään automaattisesti, kun yhdistät Redis-projektin.
 
 Jos testaat paikallisesti, hae ympäristömuuttujat komennolla:
 
