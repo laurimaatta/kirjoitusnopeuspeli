@@ -144,17 +144,59 @@ curl -X DELETE https://your-app.vercel.app/api/leaderboard \
   -d '{"secret":"your-secret-key"}'
 ```
 
-## Ympäristömuuttujat
+## API-suojaus
 
-Vercel lisää automaattisesti Redis-yhteyden yhdistämisen jälkeen:
+API on nyt suojattu useilla tasoilla:
 
+### 1. Origin-validaatio (automaattinen)
+API tarkistaa, että pyynnöt tulevat sallituista alkuperistä. Oletusarvona sallittuja ovat:
+- `https://kirjoitusnopeuspeli.vercel.app` (tuotantoversio)
+- `http://localhost:3000` ja `http://localhost:3001` (paikallinen kehitys)
+
+### 2. CORS-rajoitukset
+Vain sallituilta alkuperiltä tehdyt pyynnöt saavat CORS-otsakkeet.
+
+### 3. Rate limiting
+Maksimi 10 POST-pyyntöä minuutissa per IP-osoite.
+
+### 4. Valinnainen API-avain
+Voit lisätä ylimääräisen suojakerroksen API-avaimella.
+
+**Aseta ympäristömuuttujat Vercel Dashboardissa:**
+
+1. Mene **Project → Settings → Environment Variables**
+2. Lisää seuraavat muuttujat:
+
+**Pakollinen:**
+- `REDIS_URL` - Lisätään automaattisesti Redis:n yhdistämisen jälkeen
+
+**Valinnaiset:**
+- `ALLOWED_ORIGINS` - Pilkuilla erotettu lista sallituista alkuperistä (esim. `https://kirjoitusnopeuspeli.vercel.app,https://www.example.com`)
+  - Jos jätät tyhjäksi, käytetään oletusarvoja
+  - Aseta `*` jos haluat sallia kaikki alkuperät (ei suositeltu)
+  
+- `LEADERBOARD_API_KEY` - API-avain POST-pyyntöihin (valinnainen)
+  - Jos asetettu, kaikki POST-pyynnöt vaativat `X-API-Key` otsakkeen
+  - **Huom:** Tämä on näkyvissä client-side koodissa, joten se on lisäsuoja, ei täydellinen
+  - **Suositus:** Älä käytä API-avainta, vaan luota origin-validaatioon + rate limitingiin
+
+- `LEADERBOARD_RESET_SECRET` - Salainen avain top-listan nollaukseen
+
+**Älä lisää REDIS_URL manuaallisesti** - se lisätään automaattisesti, kun yhdistät Redis-projektin.
+
+### Testaus
+
+Voit testata API:n suojauksen:
+
+```bash
+# Tämä pitäisi toimia (sama origin)
+curl https://kirjoitusnopeuspeli.vercel.app/api/leaderboard
+
+# Tämä saattaa epäonnistua CORS-virheellä (eri origin)
+curl -X POST https://kirjoitusnopeuspeli.vercel.app/api/leaderboard \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Test","score":100}'
 ```
-REDIS_URL=redis://... (tai KV_URL=redis://...)
-```
-
-**Valinnainen:** Aseta `LEADERBOARD_RESET_SECRET` jos haluat käyttää reset-toimintoa.
-
-**Älä lisää REDIS_URL manuaalisesti** - se lisätään automaattisesti, kun yhdistät Redis-projektin.
 
 Jos testaat paikallisesti, hae ympäristömuuttujat komennolla:
 

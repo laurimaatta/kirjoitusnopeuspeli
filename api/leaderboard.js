@@ -9,6 +9,14 @@ const RATE_LIMIT_WINDOW = 60; // seconds
 const RATE_LIMIT_MAX_REQUESTS = 10; // max POST requests per window per IP
 const RESET_SECRET = process.env.LEADERBOARD_RESET_SECRET || 'change-this-secret-in-production';
 
+// Allowed origins for CORS (comma-separated, or use '*' for all)
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['https://kirjoitusnopeuspeli.vercel.app', 'http://localhost:3000', 'http://localhost:3001'];
+
+// Optional API key for additional security (set via environment variable)
+const API_KEY = process.env.LEADERBOARD_API_KEY || null;
+
 // Create Redis client - reuse connection across invocations
 let redisClient = null;
 
@@ -38,11 +46,56 @@ async function getRedisClient() {
   return redisClient;
 }
 
+// Validate origin
+function isValidOrigin(origin) {
+  if (!origin) return false;
+  
+  // Allow all if explicitly set to '*'
+  if (ALLOWED_ORIGINS.includes('*')) return true;
+  
+  // Check if origin matches any allowed origin
+  return ALLOWED_ORIGINS.some(allowed => {
+    try {
+      const originUrl = new URL(origin);
+      const allowedUrl = new URL(allowed);
+      // Match hostname and protocol
+      const hostnameMatch = originUrl.hostname === allowedUrl.hostname;
+      const protocolMatch = originUrl.protocol === allowedUrl.protocol;
+      // Also check if allowed origin has a port and origin matches it
+      if (allowedUrl.port && originUrl.port !== allowedUrl.port) {
+        return false;
+      }
+      return hostnameMatch && protocolMatch;
+    } catch {
+      // Fallback to exact string match
+      return origin === allowed || origin === allowed + '/';
+    }
+  });
+}
+
+// Get origin from request
+function getOrigin(req) {
+  return req.headers.origin || req.headers.referer?.match(/^https?:\/\/[^/]+/)?.[0] || null;
+}
+
 export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = getOrigin(req);
+  const isOriginValid = isValidOrigin(origin);
+  
+  // Set CORS headers based on origin validation
+  if (isOriginValid) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else if (ALLOWED_ORIGINS.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else {
+    // If origin is not valid, don't set CORS header (blocks CORS requests)
+    // But allow same-origin requests
+    res.setHeader('Access-Control-Allow-Origin', 'null');
+  }
+  
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -68,7 +121,26 @@ export default async function handler(req, res) {
       res.status(200).json(sorted);
       
     } else if (req.method === 'POST') {
-      // Rate limiting check
+      // Security checks for POST requests
+      
+      // 1. Origin validation - only allow requests from allowed origins
+      if (!isOriginValid && !ALLOWED_ORIGINS.includes('*')) {
+        console.warn(`Blocked POST request from invalid origin: ${origin}`);
+        return res.status(403).json({ error: 'Pääsy evätty: ei sallittu alkuperä.' });
+      }
+      
+      // 2. API Key validation (if enabled via environment variable)
+      // Note: This is optional security layer. Since client-side code is visible,
+      // this provides defense-in-depth but isn't foolproof.
+      if (API_KEY) {
+        const providedKey = req.headers['x-api-key'] || req.body?.apiKey;
+        if (!providedKey || providedKey !== API_KEY) {
+          console.warn('Blocked POST request: Invalid or missing API key');
+          return res.status(403).json({ error: 'Pääsy evätty: virheellinen API-avain.' });
+        }
+      }
+      
+      // 3. Rate limiting check
       const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress || 'unknown';
       const rateLimitKey = `${RATE_LIMIT_KEY}:${clientIp}`;
       
